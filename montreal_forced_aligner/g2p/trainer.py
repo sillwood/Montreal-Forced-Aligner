@@ -715,7 +715,10 @@ class PyniniTrainer(PronunciationDictionaryMixin, G2PTrainer, TopLevelMfaWorker)
                     p.join()
             if error_dict:
                 raise PyniniAlignmentError(error_dict)
-            (best_fst, best_likelihood) = min(return_dict.items(), key=operator.itemgetter(1))
+            try:
+                (best_fst, best_likelihood) = min(return_dict.items(), key=operator.itemgetter(1))
+            except:
+                breakpoint()
             self.log_info(f"Best likelihood: {best_likelihood}")
             self.log_debug(
                 f"Ran {self.random_starts} random starts in {time.time() - begin} seconds"

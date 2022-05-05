@@ -10,7 +10,7 @@ from queue import Empty
 from typing import List, Optional
 
 import tqdm
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, load_only, subqueryload
 
 from montreal_forced_aligner.abc import FileExporterMixin
 from montreal_forced_aligner.alignment.mixins import AlignMixin
@@ -23,9 +23,10 @@ from montreal_forced_aligner.alignment.multiprocessing import (
     GeneratePronunciationsFunction,
     construct_output_path,
     construct_output_tiers,
+    process_tg,
 )
 from montreal_forced_aligner.corpus.acoustic_corpus import AcousticCorpusPronunciationMixin
-from montreal_forced_aligner.corpus.db import Corpus, File, PhoneInterval, WordInterval
+from montreal_forced_aligner.corpus.db import Corpus, File, PhoneInterval, WordInterval, Utterance, Speaker
 from montreal_forced_aligner.data import PronunciationProbabilityCounter, TextFileType
 from montreal_forced_aligner.textgrid import export_textgrid, output_textgrid_writing_errors
 from montreal_forced_aligner.utils import Counter, KaldiProcessWorker, Stopped
@@ -511,7 +512,7 @@ class CorpusAligner(AcousticCorpusPronunciationMixin, AlignMixin, FileExporterMi
                             if new_value != last_value:
                                 pbar.update(new_value - last_value)
                                 last_value = new_value
-                            time.sleep(5)
+                            time.sleep(1)
                     except Exception:
                         stopped.stop()
                         raise
@@ -524,14 +525,29 @@ class CorpusAligner(AcousticCorpusPronunciationMixin, AlignMixin, FileExporterMi
                         export_errors.update(textgrid_errors)
                 else:
                     self.log_debug("Not using multiprocessing for TextGrid export")
+                    utterances = (
+                        session.query(Utterance)
+                        .options(
+                            subqueryload(Utterance.word_intervals),
+                            subqueryload(Utterance.phone_intervals),
+                            joinedload(Utterance.speaker).load_only(Speaker.name),
+                        )
+                    )
 
+                    for utt in utterances:
+                        process_tg(utt, files, self.export_output_directory, self.frame_shift, output_format)
+                        pbar.update(1)
+
+                    '''
                     for f in files:
                         output_path = construct_output_path(
                             f.name, f.relative_path, self.export_output_directory
                         )
                         data = construct_output_tiers(session, f.id)
-                        export_textgrid(data, output_path, f.sound_file.duration, self.frame_shift)
+                        export_textgrid(data, output_path, f.sound_file.duration, 
+                                        self.frame_shift, output_format)
                         pbar.update(1)
+                    '''
 
         if export_errors:
             self.log_warning(

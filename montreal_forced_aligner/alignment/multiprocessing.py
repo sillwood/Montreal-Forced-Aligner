@@ -646,23 +646,34 @@ class AlignmentExtractionFunction(KaldiFunction):
                 if position in {"B", "S"}:
                     current_word_begin = interval.begin
                 if position in {"E", "S"}:
-                    if (
-                        self.cleanup_textgrids
-                        and actual_word_intervals
-                        and self.clitic_marker
-                        and (
-                            actual_word_intervals[-1].label.endswith(self.clitic_marker)
-                            or words[words_index].endswith(self.clitic_marker)
-                        )
-                    ):
-                        actual_word_intervals[-1].end = interval.end
-                        actual_word_intervals[-1].label += words[words_index]
-                    else:
+                    try:
+                        if (
+                                self.cleanup_textgrids
+                                and actual_word_intervals
+                                and self.clitic_marker
+                                and (
+                                    actual_word_intervals[-1].label.endswith(self.clitic_marker)
+                                    or words[words_index].endswith(self.clitic_marker)
+                                )
+                        ):
+                            actual_word_intervals[-1].end = interval.end
+                            actual_word_intervals[-1].label += words[words_index]
+                        else:
+                            actual_word_intervals.append(
+                                CtmInterval(
+                                    current_word_begin,
+                                    interval.end,
+                                    words[words_index],
+                                    utterance_name,
+                                )
+                            )
+                    except:
+                        print("something broke")
                         actual_word_intervals.append(
                             CtmInterval(
                                 current_word_begin,
                                 interval.end,
-                                words[words_index],
+                                words[-1],
                                 utterance_name,
                             )
                         )
@@ -842,6 +853,7 @@ def construct_output_tiers(
         Aligned tiers
     """
     data = {}
+    '''
     utterances = (
         session.query(Utterance)
         .options(
@@ -851,12 +863,16 @@ def construct_output_tiers(
         )
         .filter_by(file_id=file_id)
     )
+    '''
+    utterances = (
+        session.query(Utterance)
+        .filter_by(file_id=file_id)
+    )
     for utt in utterances:
         if utt.speaker.name not in data:
             data[utt.speaker.name] = {"words": [], "phones": []}
         for wi in utt.word_intervals:
             data[utt.speaker.name]["words"].append(CtmInterval(wi.begin, wi.end, wi.label, utt.id))
-
         for pi in utt.phone_intervals:
             data[utt.speaker.name]["phones"].append(
                 CtmInterval(pi.begin, pi.end, pi.label, utt.id)
@@ -891,6 +907,24 @@ def construct_output_path(
     output_path = os.path.join(relative, name + extension)
     os.makedirs(relative, exist_ok=True)
     return output_path
+
+import time
+
+def process_tg(utt, files, export_output_directory, frame_shift, output_format):
+    data = {}
+    if utt.speaker.name not in data:
+        data[utt.speaker.name] = {"words": [], "phones": []}
+    for wi in utt.word_intervals:
+        data[utt.speaker.name]["words"].append(CtmInterval(wi.begin, wi.end, wi.label, utt.id))
+    for pi in utt.phone_intervals:
+        data[utt.speaker.name]["phones"].append(
+            CtmInterval(pi.begin, pi.end, pi.label, utt.id)
+        )
+    f = utt.file
+    output_path = construct_output_path(
+        f.name, f.relative_path, export_output_directory
+    )
+    export_textgrid(data, output_path, f.sound_file.duration, frame_shift, output_format)
 
 
 class ExportTextGridProcessWorker(mp.Process):

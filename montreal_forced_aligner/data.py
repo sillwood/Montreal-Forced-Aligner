@@ -16,24 +16,68 @@ from praatio.utilities.constants import Interval, TextgridFormats
 
 from .exceptions import CtmError
 
-if typing.TYPE_CHECKING:
-    from dataclasses import dataclass
-else:
-    from dataclassy import dataclass
-
 __all__ = [
     "MfaArguments",
     "CtmInterval",
     "TextFileType",
     "SoundFileType",
+    "WordType",
+    "PhoneType",
     "PhoneSetType",
     "WordData",
-    "Pronunciation",
+    "DatabaseImportData",
     "PronunciationProbabilityCounter",
 ]
 
 
-@dataclass(slots=True)
+# noinspection PyUnresolvedReferences
+@dataclassy.dataclass(slots=True)
+class DatabaseImportData:
+    """
+    Class for storing information on importing data into the database
+
+    Parameters
+    ----------
+    speaker_objects: list[dict[str, Any]]
+        List of dictionaries with :class:`~montreal_forced_aligner.db.Speaker` properties
+    file_objects: list[dict[str, Any]]
+        List of dictionaries with :class:`~montreal_forced_aligner.db.File` properties
+    text_file_objects: list[dict[str, Any]]
+        List of dictionaries with :class:`~montreal_forced_aligner.db.TextFile` properties
+    sound_file_objects: list[dict[str, Any]]
+        List of dictionaries with :class:`~montreal_forced_aligner.db.SoundFile` properties
+    speaker_ordering_objects: list[dict[str, Any]]
+        List of dictionaries with :class:`~montreal_forced_aligner.db.SpeakerOrdering` properties
+    utterance_objects: list[dict[str, Any]]
+        List of dictionaries with :class:`~montreal_forced_aligner.db.Utterance` properties
+    """
+
+    speaker_objects: typing.List[typing.Dict[str, typing.Any]] = dataclassy.factory(list)
+    file_objects: typing.List[typing.Dict[str, typing.Any]] = dataclassy.factory(list)
+    text_file_objects: typing.List[typing.Dict[str, typing.Any]] = dataclassy.factory(list)
+    sound_file_objects: typing.List[typing.Dict[str, typing.Any]] = dataclassy.factory(list)
+    speaker_ordering_objects: typing.List[typing.Dict[str, typing.Any]] = dataclassy.factory(list)
+    utterance_objects: typing.List[typing.Dict[str, typing.Any]] = dataclassy.factory(list)
+
+    def add_objects(self, other_import: DatabaseImportData) -> None:
+        """
+        Combine objects for two importers
+
+        Parameters
+        ----------
+        other_import: :class:`~montreal_forced_aligner.data.DatabaseImportData`
+            Other object with objects to import
+        """
+        self.speaker_objects.extend(other_import.speaker_objects)
+        self.file_objects.extend(other_import.file_objects)
+        self.text_file_objects.extend(other_import.text_file_objects)
+        self.sound_file_objects.extend(other_import.sound_file_objects)
+        self.speaker_ordering_objects.extend(other_import.speaker_ordering_objects)
+        self.utterance_objects.extend(other_import.utterance_objects)
+
+
+# noinspection PyUnresolvedReferences
+@dataclassy.dataclass(slots=True)
 class MfaArguments:
     """
     Base class for argument classes for MFA functions
@@ -57,8 +101,8 @@ class TextFileType(enum.Enum):
     """Enum for types of text files"""
 
     NONE = "none"
-    TEXTGRID = TextgridFormats.SHORT_TEXTGRID
-    LONG_TEXTGRID = TextgridFormats.LONG_TEXTGRID
+    TEXTGRID = TextgridFormats.LONG_TEXTGRID
+    SHORT_TEXTGRID = TextgridFormats.SHORT_TEXTGRID
     LAB = "lab"
     JSON = TextgridFormats.JSON
 
@@ -111,6 +155,27 @@ def voiced_variants(base_phone) -> typing.Set[str]:
     }
 
 
+class PhoneType(enum.Enum):
+    """Enum for types of phones"""
+
+    non_silence = 1
+    silence = 2
+    disambiguation = 3
+
+
+class WordType(enum.Enum):
+    """Enum for types of words"""
+
+    speech = 1
+    clitic = 2
+    silence = 3
+    oov = 4
+    bracketed = 5
+    laughter = 6
+    noise = 7
+    music = 8
+
+
 class PhoneSetType(enum.Enum):
     """Enum for types of phone sets"""
 
@@ -138,7 +203,7 @@ class PhoneSetType(enum.Enum):
             return re.compile(r"[a-z]{1,3}[12345]")
         elif self is PhoneSetType.IPA:
             return re.compile(
-                r"[əɚʊɡɤʁɹɔɛʉɒβɲɟʝŋʃɕʰʲɾ̃̚ː˩˨˧˦˥̪̝̟̥̂̀̄ˑ̊ᵝ̠̹̞̩̯̬̺ˀˤ̻̙̘̰̤̜̹̑̽᷈᷄᷅̌̋̏‿̆͜͡ˌˈ̣]"
+                r"[əɚʊɡɤʁɹɔɛʉɒβɲɟʝŋʃɕʰʲɾ̃̚ː˩˨˧˦˥̪̝̟̥̂̀̄ˑ̊ᵝ̠̹̞̩̯̬̺ˀˤ̻̙̘̰̤̜̑̽᷈᷄᷅̌̋̏‿̆͜͡ˌˈ̣]"
             )
         return None
 
@@ -146,7 +211,7 @@ class PhoneSetType(enum.Enum):
     def suprasegmental_phone_regex(self) -> typing.Optional[re.Pattern]:
         """Regex for creating base phones"""
         if self is PhoneSetType.IPA:
-            return re.compile(r"([ː̟̥̂̀̄ˑ̊ᵝ̠̹̞̩̯̬̺ˤ̻̙̘̤̜̹̑̽᷈᷄᷅̌̋̏‿̆͜͡ˌ̍ʱʰʲ̚ʼ͈ˈ̣ᵝ]+)")
+            return re.compile(r"([ː̟̥̂̀̄ˑ̊ᵝ̠̹̞̩̯̬̺ˤ̻̙̘̤̜̑̽᷈᷄᷅̌̋̏‿̆͜͡ˌ̍ʱʰʲ̚ʼ͈ˈ̣]+)")
         return None
 
     @property
@@ -157,7 +222,7 @@ class PhoneSetType(enum.Enum):
         elif self is PhoneSetType.PINYIN:
             return re.compile(r"[12345]")
         elif self is PhoneSetType.IPA:
-            return re.compile(r"([ː˩˨˧˦˥̟̥̂̀̄ˑ̊ᵝ̠̹̞̩̯̬̺ˀˤ̻̙̘̤̜̹̑̽᷈᷄᷅̌̋̏‿̆͜͡ˌ̍ˈ]+)")
+            return re.compile(r"([ː˩˨˧˦˥̟̥̂̀̄ˑ̊ᵝ̠̹̞̩̯̬̺ˀˤ̻̙̘̤̜̑̽᷈᷄᷅̌̋̏‿̆͜͡ˌ̍ˈ]+)")
         return None
 
     @property
@@ -997,7 +1062,8 @@ class PhoneSetType(enum.Enum):
         return extra_questions
 
 
-@dataclass(slots=True)
+# noinspection PyUnresolvedReferences
+@dataclassy.dataclass(slots=True)
 class SoundFileInformation:
     """
     Data class for sound file information with format, duration, number of channels, bit depth, and
@@ -1029,7 +1095,8 @@ class SoundFileInformation:
         return dataclassy.asdict(self)
 
 
-@dataclass(slots=True)
+# noinspection PyUnresolvedReferences
+@dataclassy.dataclass(slots=True)
 class FileExtensions:
     """
     Data class for information about the current directory
@@ -1055,68 +1122,8 @@ class FileExtensions:
     other_audio_files: typing.Dict[str, str]
 
 
-@dataclass(slots=True)
-class Pronunciation:
-    """
-    Data class for information about a pronunciation string
-
-    Parameters
-    ----------
-    pronunciation: tuple
-        Tuple of phones
-    probability: float
-        Probability of pronunciation
-    disambiguation: Optional[int]
-        Disambiguation index within a pronunciation dictionary
-    silence_after_probability: Optional[float]
-        Probability of silence after the pronunciation
-    silence_before_correction: Optional[float]
-        Correction factor for probability of silence before the pronunciation
-    non_silence_before_correction: Optional[float]
-        Correction factor for probability of non-silence before the pronunciation
-    """
-
-    pronunciation: typing.Tuple[str, ...]
-    probability: float = 1.0
-    disambiguation: int = None
-    silence_after_probability: float = None
-    silence_before_correction: float = None
-    non_silence_before_correction: float = None
-
-    def __hash__(self):
-        """Hash of the pronunciation"""
-        return hash(self.pronunciation)
-
-    def __len__(self):
-        """Length of pronunciation"""
-        return len(self.pronunciation)
-
-    def __repr__(self):
-        """Representation"""
-        return f"<Pronunciation /{' '.join(self.pronunciation)}/>"
-
-    def __bool__(self) -> bool:
-        """Check for phones in the pronunciation"""
-        return bool(self.pronunciation)
-
-    def __str__(self):
-        """String format"""
-        return f"{' '.join(self.pronunciation)}"
-
-    def __eq__(self, other: Pronunciation):
-        """Check for whether two pronunciations are equal"""
-        return self.pronunciation == other.pronunciation
-
-    def __lt__(self, other: Pronunciation):
-        """Check for whether one pronunciation is less than another"""
-        return self.pronunciation < other.pronunciation
-
-    def __gt__(self, other: Pronunciation):
-        """Check for whether one pronunciation is greater than another"""
-        return self.pronunciation > other.pronunciation
-
-
-@dataclass(slots=True)
+# noinspection PyUnresolvedReferences
+@dataclassy.dataclass(slots=True)
 class WordData:
     """
     Data class for information about a word and its pronunciations
@@ -1125,55 +1132,16 @@ class WordData:
     ----------
     orthography: str
         Orthographic string for the word
-    pronunciations: dict[tuple[str, ...], :class:`~montreal_forced_aligner.data.Pronunciation`]
-        Dictionary mapping of pronunciations for the word
+    pronunciations: set[tuple[str, ...]
+        Set of tuple pronunciations for the word
     """
 
     orthography: str
-    pronunciations: typing.Dict[typing.Tuple[str, ...], Pronunciation]
-
-    def __init__(self, orthography: str, pronunciations: typing.Collection[Pronunciation]):
-        self.orthography = orthography
-        self.pronunciations = {}
-        if isinstance(pronunciations, dict):
-            self.pronunciations.update(pronunciations)
-        else:
-            for p in pronunciations:
-                self.pronunciations[p.pronunciation] = p
-
-    def add_pronunciation(self, pronunciation: Pronunciation) -> None:
-        """Add pronunciation for a word
-
-        Parameters
-        ----------
-        pronunciation: :class:`~montreal_forced_aligner.data.Pronunciation`
-            Pronunciation to add
-        """
-        self.pronunciations[pronunciation.pronunciation] = pronunciation
-
-    def __repr__(self) -> str:
-        """Word object representation"""
-        pronunciation_string = ", ".join(map(str, self.pronunciations))
-        return f"<Word {self.orthography} with pronunciations {pronunciation_string}>"
-
-    def __hash__(self) -> hash:
-        """Word hash"""
-        return hash(self.orthography)
-
-    def __len__(self) -> int:
-        """Number of pronunciations"""
-        return len(self.pronunciations)
-
-    def __getitem__(self, item: typing.Tuple[str, ...]) -> Pronunciation:
-        return self.pronunciations[item]
-
-    def __iter__(self) -> typing.Generator[Pronunciation]:
-        """Iterator over pronunciations"""
-        for p in self.pronunciations.values():
-            yield p
+    pronunciations: typing.Set[typing.Tuple[str, ...]]
 
 
-@dataclass(slots=True)
+# noinspection PyUnresolvedReferences
+@dataclassy.dataclass(slots=True)
 class PronunciationProbabilityCounter:
     """
     Data class for count information used in pronunciation probability modeling
@@ -1230,7 +1198,8 @@ class PronunciationProbabilityCounter:
         self.non_silence_before_counts.update(other_counter.non_silence_before_counts)
 
 
-@dataclass(slots=True)
+# noinspection PyUnresolvedReferences
+@dataclassy.dataclass(slots=True)
 class CtmInterval:
     """
     Data class for intervals derived from CTM files
@@ -1270,7 +1239,8 @@ class CtmInterval:
 
     def to_tg_interval(self) -> Interval:
         """
-        Converts the CTMInterval to `PraatIO's Interval class <http://timmahrt.github.io/praatIO/praatio/utilities/constants.html#Interval>`_
+        Converts the CTMInterval to
+        `PraatIO's Interval class <http://timmahrt.github.io/praatIO/praatio/utilities/constants.html#Interval>`_
 
         Returns
         -------
